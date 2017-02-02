@@ -179,6 +179,7 @@ static const NSInteger kBlobAsImageFile = 4;
 	// Loop through the rows, adding their descriptive contents
 	NSUInteger rowIndex = [selectedRows firstIndex];
 	NSString *nullString = [prefs objectForKey:SPNullValue];
+	BOOL hexBlobs = [[prefs objectForKey: SPCopyBLOBsAsHex] boolValue];
 	Class spmysqlGeometryData = [SPMySQLGeometryData class];
 	NSUInteger rowCounter = 0;
 
@@ -202,7 +203,11 @@ static const NSInteger kBlobAsImageFile = 4;
 					[result appendFormat:@"%@\t", NSLocalizedString(@"(not loaded)", @"value shown for hidden blob and text fields")];
 				else if ([cellData isKindOfClass:[NSData class]]) {
 					if(withBlobHandling == kBlobInclude) {
-						NSString *displayString = [[NSString alloc] initWithData:cellData encoding:[mySQLConnection stringEncoding]];
+						NSString *displayString;
+						if (hexBlobs)
+							displayString = [[cellData dataToHexString] copy];
+						else
+							displayString = [[NSString alloc] initWithData:cellData encoding:[mySQLConnection stringEncoding]];
 						if (!displayString) displayString = [[NSString alloc] initWithData:cellData encoding:NSASCIIStringEncoding];
 						if (displayString) {
 							[result appendFormat:@"%@\t", displayString];
