@@ -54,6 +54,7 @@
 @interface SPTableContent (SPDeclaredAPI)
 
 - (BOOL)cancelRowEditing;
+- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex;
 
 @end
 
@@ -323,7 +324,7 @@
 					cellValue = [NSString stringWithString:[prefs objectForKey:SPNullValue]];
 				}
 
-				if ([[columnDefinition objectForKey:@"typegrouping"] isEqualToString:@"binary"] && [prefs boolForKey:SPDisplayBinaryDataAsHex]) {
+				if ([self cellValueIsDisplayedAsHexForColumn:[[tableColumn identifier] integerValue]]) {
 					[fieldEditor setTextMaxLength:[[self tableView:tableContentView objectValueForTableColumn:tableColumn row:rowIndex] length]];
 					isFieldEditable = NO;
 				}
@@ -511,16 +512,8 @@
 			else {
 				[cell setTextColor:blackColor];
 			}
-
-			NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
-
-			NSString *columnType = [columnDefinition objectForKey:@"typegrouping"];
-
-			// Find a more reliable way of doing this check
-			if ([columnType isEqualToString:@"binary"] &&
-				[prefs boolForKey:SPDisplayBinaryDataAsHex] &&
-				[[self tableView:tableContentView objectValueForTableColumn:tableColumn row:rowIndex] hasPrefix:@"0x"]) {
-
+			
+			if ([self cellValueIsDisplayedAsHexForColumn:[[tableColumn identifier] integerValue]]) {
 				[cell setTextColor:rowIndex == [tableContentView selectedRow] ? whiteColor : blueColor];
 			}
 

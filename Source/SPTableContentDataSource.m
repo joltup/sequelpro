@@ -107,10 +107,6 @@
 				value = [self _contentValueForTableColumn:columnIndex row:rowIndex asPreview:YES];
 			}
 		}
-
-		NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
-
-		NSString *columnType = [columnDefinition objectForKey:@"typegrouping"];
 		
 		if ([value isKindOfClass:[SPMySQLGeometryData class]]) {
 			return [value wktString];
@@ -121,9 +117,12 @@
 		}
 		
 		if ([value isKindOfClass:[NSData class]]) {
-
-			if ([columnType isEqualToString:@"binary"] && [prefs boolForKey:SPDisplayBinaryDataAsHex]) {
-				return [NSString stringWithFormat:@"0x%@", [value dataToHexString]];
+			
+			if ([self cellValueIsDisplayedAsHexForColumn:columnIndex]) {
+				if ([(NSData *)value length] > 255) {
+					return [NSString stringWithFormat:@"0x%@...", [[(NSData *)value subdataWithRange:NSMakeRange(0, 255)] dataToHexString]];
+				}
+				return [NSString stringWithFormat:@"0x%@", [(NSData *)value dataToHexString]];
 			}
 
 			pthread_mutex_t *fieldEditorCheckLock = NULL;
@@ -131,8 +130,12 @@
 				fieldEditorCheckLock = &tableValuesLock;
 			}
 
-			// Always retrieve the short string representation, truncating the value where necessary
-			return [value shortStringRepresentationUsingEncoding:[mySQLConnection stringEncoding]];
+			// Unless we're editing, always retrieve the short string representation, truncating the value where necessary
+			if ([tableView editedColumn] == (NSInteger)columnIndex || [tableView editedRow] == rowIndex) {
+				return [value stringRepresentationUsingEncoding:[mySQLConnection stringEncoding]];
+			} else {
+				return [value shortStringRepresentationUsingEncoding:[mySQLConnection stringEncoding]];
+			}
 		}
 		
 		if ([value isSPNotLoaded]) {
@@ -228,6 +231,27 @@
 			[tableValues replaceObjectInRow:rowIndex column:[[tableColumn identifier] integerValue] withObject:@""];
 		}
 	}
+}
+
+- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex
+{
+	if (![prefs boolForKey:SPDisplayBinaryDataAsHex]) {
+		return NO;
+	}
+	
+	NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
+	NSString *typeGrouping = columnDefinition[@"typegrouping"];
+	
+	if ([typeGrouping isEqual:@"binary"]) {
+		return YES;
+	}
+	
+	if ([typeGrouping isEqual:@"blobdata"]) {
+		return YES;
+	}
+	
+	
+	return NO;
 }
 
 @end

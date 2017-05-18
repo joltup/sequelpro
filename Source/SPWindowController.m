@@ -39,15 +39,6 @@
 #import <PSMTabBar/PSMTabBarControl.h>
 #import <PSMTabBar/PSMTabStyle.h>
 
-// Forward-declare for 10.7 compatibility
-#if !defined(MAC_OS_X_VERSION_10_7) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
-enum {
-	NSWindowCollectionBehaviorFullScreenPrimary = 1 << 7,
-	NSWindowCollectionBehaviorFullScreenAuxiliary = 1 << 8,
-	NSFullScreenWindowMask = 1 << 14
-};
-#endif
-
 @interface SPWindowController ()
 
 - (void)_setUpTabBar;
@@ -169,15 +160,14 @@ enum {
  */
 - (IBAction)closeTab:(id)sender
 {
-	// Return if the selected tab shouldn't be closed
-	if (![selectedTableDocument parentTabShouldClose]) return;
-
 	// If there are multiple tabs, close the front tab.
 	if ([tabView numberOfTabViewItems] > 1) {
+		// Return if the selected tab shouldn't be closed
+		if (![selectedTableDocument parentTabShouldClose]) return;
 		[tabView removeTabViewItem:[tabView selectedTabViewItem]];
-		
 	} 
 	else {
+		//trying to close the window will itself call parentTabShouldClose for all tabs in windowShouldClose:
 		[[self window] performClose:self];
 	}
 }

@@ -81,6 +81,7 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 @interface SPTableContent ()
 
 - (BOOL)cancelRowEditing;
+- (void)documentWillClose:(NSNotification *)notification;
 
 @end
 
@@ -172,7 +173,6 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 		usedQuery = [[NSString alloc] initWithString:@""];
 
 		tableLoadTimer = nil;
-		tableLoadingCondition = [NSCondition new];
 
 		blackColor = [NSColor blackColor];
 		lightGrayColor = [NSColor lightGrayColor];
@@ -243,20 +243,16 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 	
 	[nibLoader release];
 	
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_7
 	//let's see if we can use the NSPopover (10.7+) or have to make do with our legacy clone.
 	//this is using reflection right now, as our SDK is 10.8 but our minimum supported version is 10.6
 	Class popOverClass = NSClassFromString(@"NSPopover");
-	if(popOverClass)
-	{
+	if(popOverClass) {
 		paginationPopover = [[popOverClass alloc] init];
 		[paginationPopover setDelegate:(SPTableContent<NSPopoverDelegate> *)self];
 		[paginationPopover setContentViewController:paginationViewController];
 		[paginationPopover setBehavior:NSPopoverBehaviorTransient];
 	}
-	else
-#endif
-	{
+	else {
 		[paginationBox setContentView:[paginationViewController view]];
 		
 		// Add the pagination view to the content area
@@ -297,6 +293,10 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 											 selector:@selector(endDocumentTaskForTab:)
 												 name:SPDocumentTaskEndNotification
 											   object:tableDocumentInstance];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+	                                         selector:@selector(documentWillClose:)
+	                                             name:SPDocumentWillCloseNotification
+	                                           object:tableDocumentInstance];
 }
 
 #pragma mark -
@@ -1060,11 +1060,8 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 	// Set up the table updates timer and wait for it to notify this thread about completion
 	[[self onMainThread] initTableLoadTimer];
 
-	[tableLoadingCondition lock];
-	while (![tableValues dataDownloaded]) {
-		[tableLoadingCondition waitUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
-	}
-	[tableLoadingCondition unlock];
+	[tableValues awaitDataDownloaded];
+
 	tableRowsCount = [tableValues count];
 
 	// If the final column autoresize wasn't performed, perform it
@@ -1269,10 +1266,7 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 	}
 
 	if ([tableValues dataDownloaded]) {
-		[tableLoadingCondition lock];
-		[tableLoadingCondition signal];
 		[self clearTableLoadTimer];
-		[tableLoadingCondition unlock];
 	}
 
 	// Check whether a table update is required, based on whether new rows are
@@ -1638,13 +1632,11 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 }
 #endif
 
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_7
 - (void)popoverDidClose:(NSNotification *)notification
 {
 	//not to hide the view, but to change the paginationButton
 	[self setPaginationViewVisibility:NO];
 }
-#endif
 
 /**
  * Show or hide the pagination layer, also changing the first responder as appropriate.
@@ -1672,7 +1664,6 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 		}
 	}
 	
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_7
 	if(paginationPopover) {
 		if(makeVisible) {
 			[paginationPopover showRelativeToRect:[paginationButton bounds] ofView:paginationButton preferredEdge:NSMinYEdge];
@@ -1684,7 +1675,6 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 		}
 		return;
 	}
-#endif
 	
 	if (makeVisible) {
 		if (paginationViewFrame.size.height == paginationViewHeight) return;
@@ -2558,13 +2548,15 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 			@"filterValue": targetFilterValue,
 			@"filterComparison": SPBoxNil(filterComparison)
 		};
-		[self setFiltersToRestore:filterSettings];
-
-		// Attempt to switch to the target table
-		if (![tablesListInstance selectItemWithName:[refDictionary objectForKey:@"table"]]) {
-			NSBeep();
-			[self setFiltersToRestore:nil];
-		}
+		SPMainQSync(^{
+			[self setFiltersToRestore:filterSettings];
+			
+			// Attempt to switch to the target table
+			if (![tablesListInstance selectItemWithName:[refDictionary objectForKey:@"table"]]) {
+				NSBeep();
+				[self setFiltersToRestore:nil];
+			}
+		});
 	}
 
 #ifndef SP_CODA
@@ -4157,6 +4149,13 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 	tableRowsSelectable = YES;
 }
 
+//this method is called right before the UI objects are deallocated
+- (void)documentWillClose:(NSNotification *)notification
+{
+	// if a result load is in progress we must stop the timer or it may try to call invalid IBOutlets
+	[self clearTableLoadTimer];
+}
+
 #pragma mark -
 #pragma mark KVO methods
 
@@ -4241,7 +4240,6 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 	if(fieldEditor) SPClear(fieldEditor);
 
 	[self clearTableLoadTimer];
-	SPClear(tableLoadingCondition);
 	SPClear(tableValues);
 	pthread_mutex_destroy(&tableValuesLock);
 	SPClear(dataColumns);

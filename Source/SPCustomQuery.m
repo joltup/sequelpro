@@ -61,6 +61,7 @@
 #import "SPAppController.h"
 #import "SPBundleHTMLOutputController.h"
 #endif
+#import "SPFunctions.h"
 
 #import <pthread.h>
 #import <SPMySQL/SPMySQL.h>
@@ -69,6 +70,7 @@
 
 - (id)_resultDataItemAtRow:(NSInteger)row columnIndex:(NSUInteger)column preserveNULLs:(BOOL)preserveNULLs asPreview:(BOOL)asPreview;
 + (NSString *)linkToHelpTopic:(NSString *)aTopic;
+- (void)documentWillClose:(NSNotification *)notification;
 
 @end
 
@@ -754,7 +756,7 @@
 					if (![mySQLConnection lastQueryWasCancelled]) {
 
 						[tableDocumentInstance setTaskIndicatorShouldAnimate:NO];
-						[SPAlertSheets beginWaitingAlertSheetWithTitle:@"title"
+						[SPAlertSheets beginWaitingAlertSheetWithTitle:NSLocalizedString(@"MySQL Error", @"mysql error message")
 						                                 defaultButton:NSLocalizedString(@"Run All", @"run all button")
 						                               alternateButton:NSLocalizedString(@"Continue", @"continue button")
 						                                   otherButton:NSLocalizedString(@"Stop", @"stop button")
@@ -763,7 +765,6 @@
 						                                 modalDelegate:self
 						                                didEndSelector:@selector(sheetDidEnd:returnCode:contextInfo:)
 						                                   contextInfo:@"runAllContinueStopSheet"
-						                                           msg:NSLocalizedString(@"MySQL Error", @"mysql error message")
 						                                      infoText:[mySQLConnection lastErrorMessage]
 						                                    returnCode:&runAllContinueStopSheetReturnCode];
 
@@ -803,7 +804,7 @@
 	// Reload table list if at least one query began with drop, alter, rename, or create
 	if(tableListNeedsReload || databaseWasChanged) {
 		// Build database pulldown menu
-		[tableDocumentInstance setDatabases:self];
+		[[tableDocumentInstance onMainThread] setDatabases:self];
 
 		if (databaseWasChanged)
 			// Reset the current database
@@ -885,7 +886,7 @@
 								(long)totalAffectedRows
 							];
 		}
-		if(resultDataCount) {
+		if([resultData count]) {
 			// we were running a query that returns a result set (ie. SELECT).
 			// TODO: mysql_query() returns as soon as the first result row is found (which might be pretty soon when using indexes / not doing aggregations)
 			//       and that makes our query time measurement pretty useless (see #264)
@@ -906,7 +907,7 @@
 #endif
 
 	// If no results were returned, redraw the empty table and post notifications before returning.
-	if ( !resultDataCount ) {
+	if ( ![resultData count] ) {
 		[customQueryView performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:YES];
 
 		// Notify any listeners that the query has completed
@@ -931,8 +932,6 @@
 
 		return;
 	}
-
-	[[customQueryView onMainThread] reloadData];
 
 	// Restore the result view origin if appropriate
 	if (!NSEqualRects(selectionViewportToRestore, NSZeroRect)) {
@@ -977,12 +976,12 @@
  */
 - (void)updateResultStore:(SPMySQLStreamingResultStore *)theResultStore
 {
-
-	// Remove all items from the table
-	resultDataCount = 0;
-	[customQueryView performSelectorOnMainThread:@selector(noteNumberOfRowsChanged) withObject:nil waitUntilDone:YES];
 	pthread_mutex_lock(&resultDataLock);
-	[resultData removeAllRows];
+	// Remove all items from the table
+	SPMainQSync(^{
+		[resultData removeAllRows];
+		[customQueryView noteNumberOfRowsChanged];
+	});
 
 	// Add the new store
 	[resultData setDataStorage:theResultStore updatingExisting:NO];
@@ -994,16 +993,9 @@
 	// Set up the table updates timer and wait for it to notify this thread about completion
 	[[self onMainThread] initQueryLoadTimer];
 
-	[resultLoadingCondition lock];
-	while (![resultData dataDownloaded]) {
-		[resultLoadingCondition waitUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
-	}
-	[resultLoadingCondition unlock];
-
-	// If the final column autoresize wasn't performed, perform it
-	if (queryLoadLastRowCount < 200) [[self onMainThread] autosizeColumns];
-
-	[customQueryView performSelectorOnMainThread:@selector(noteNumberOfRowsChanged) withObject:nil waitUntilDone:NO];
+	[resultData awaitDataDownloaded];
+	
+	// Any further UI updates are the responsibility of the timer callback
 }
 
 /**
@@ -1493,23 +1485,20 @@
  */
 - (void) queryLoadUpdate:(NSTimer *)theTimer
 {
-	resultDataCount = [resultData count];
-
+	NSUInteger resultDataCount = [resultData count];
+	
 	if (queryLoadTimerTicksSinceLastUpdate < queryLoadInterfaceUpdateInterval) {
 		queryLoadTimerTicksSinceLastUpdate++;
 		return;
 	}
 
 	if ([resultData dataDownloaded]) {
-		[resultLoadingCondition lock];
-		[resultLoadingCondition signal];
 		[self clearQueryLoadTimer];
-		[resultLoadingCondition unlock];
 	}
 
 	// Check whether a table update is required, based on whether new rows are
 	// available to display.
-	if (resultDataCount == (NSInteger)queryLoadLastRowCount) {
+	if (resultDataCount == queryLoadLastRowCount) {
 		return;
 	}
 
@@ -1556,7 +1545,7 @@
  */
 - (NSUInteger)currentResultRowCount
 {
-	return resultDataCount;
+	return [resultData count];
 }
 
 /**
@@ -2085,7 +2074,7 @@
  */
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)aTableView
 {
-	return (aTableView == customQueryView) ? (resultData == nil) ? 0 : resultDataCount : 0;
+	return (aTableView == customQueryView) ? (resultData == nil) ? 0 : [resultData count] : 0;
 }
 
 /**
@@ -2110,7 +2099,7 @@
 		if (isWorking) {
 			pthread_mutex_lock(&resultDataLock);
 				
-			if (rowIndex < resultDataCount && columnIndex < [resultData columnCount]) {
+			if (SPIntS2U(rowIndex) < [resultData count] && columnIndex < [resultData columnCount]) {
 				showCellAsGray = [resultData cellIsNullOrUnloadedAtRow:rowIndex column:columnIndex];
 			} else {
 				showCellAsGray = YES;
@@ -2411,7 +2400,7 @@
 	// cases.
 	if (isWorking) {
 		pthread_mutex_lock(&resultDataLock);
-		if (row < resultDataCount && (NSUInteger)[[aTableColumn identifier] integerValue] < [resultData columnCount]) {
+		if (SPIntS2U(row) < [resultData count] && (NSUInteger)[[aTableColumn identifier] integerValue] < [resultData columnCount]) {
 			theValue = [[SPDataStorageObjectAtRowAndColumn(resultData, row, [[aTableColumn identifier] integerValue]) copy] autorelease];
 		}
 		pthread_mutex_unlock(&resultDataLock);
@@ -3777,7 +3766,6 @@
 #endif
 
 		// init tableView's data source
-		resultDataCount = 0;
 		resultData = [[SPDataStorage alloc] init];
 		editedRow = -1;
 
@@ -3788,7 +3776,6 @@
 		runPrimaryActionButtonAsSelection = nil;
 
 		queryLoadTimer = nil;
-		resultLoadingCondition = [NSCondition new];
 
 		prefs = [NSUserDefaults standardUserDefaults];
 
@@ -4000,6 +3987,10 @@
 											 selector:@selector(endDocumentTaskForTab:)
 												 name:SPDocumentTaskEndNotification
 											   object:tableDocumentInstance];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+	                                         selector:@selector(documentWillClose:)
+	                                             name:SPDocumentWillCloseNotification
+	                                           object:tableDocumentInstance];
 
 #ifndef SP_CODA
 	[prefs addObserver:self forKeyPath:SPGlobalResultTableFont options:NSKeyValueObservingOptionNew context:NULL];
@@ -4031,7 +4022,7 @@
 	if (isWorking) {
 		pthread_mutex_lock(&resultDataLock);
 		
-		if (row < resultDataCount && column < [resultData columnCount]) {
+		if (SPIntS2U(row) < [resultData count] && column < [resultData columnCount]) {
 			value = SPDataStoragePreviewAtRowAndColumn(resultData, row, column, 150);
 		}
 		
@@ -4060,6 +4051,13 @@
 	return value;
 }
 
+//this method is called right before the UI objects are deallocated
+- (void)documentWillClose:(NSNotification *)notification
+{
+	// if a result load is in progress we must stop the timer or it may try to call invalid IBOutlets
+	[self clearQueryLoadTimer];
+}
+
 #pragma mark -
 
 - (void)dealloc
@@ -4071,7 +4069,6 @@
 	[NSObject cancelPreviousPerformRequestsWithTarget:customQueryView];
 
 	[self clearQueryLoadTimer];
-	SPClear(resultLoadingCondition);
 	SPClear(usedQuery);
 	SPClear(lastExecutedQuery);
 	SPClear(resultData);
