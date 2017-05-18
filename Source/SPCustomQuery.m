@@ -4058,6 +4058,28 @@
 	[self clearQueryLoadTimer];
 }
 
+- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex
+{
+	if (![prefs boolForKey:SPDisplayBinaryDataAsHex]) {
+		return NO;
+	}
+	
+	NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
+	NSString *typeGrouping = columnDefinition[@"typegrouping"];
+	
+	if ([typeGrouping isEqual:@"binary"]) {
+		return YES;
+	}
+	
+	if ([typeGrouping isEqual:@"blobdata"]) {
+		return YES;
+	}
+	
+	
+	return NO;
+}
+
+
 #pragma mark -
 
 - (void)dealloc
