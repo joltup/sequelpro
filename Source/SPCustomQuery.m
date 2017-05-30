@@ -4045,6 +4045,13 @@
 		return preserveNULLs ? value : [prefs objectForKey:SPNullValue];
 
 	if ([value isKindOfClass:[NSData class]]) {
+		if ([self cellValueIsDisplayedAsHexForColumn: column]) {
+			if ([(NSData *)value length] > 255) {
+				return [NSString stringWithFormat:@"0x%@…", [[(NSData *)value subdataWithRange:NSMakeRange(0, 255)] dataToHexString]];
+			}
+			return [NSString stringWithFormat:@"0x%@", [(NSData *)value dataToHexString]];
+
+		}
 		return [value stringRepresentationUsingEncoding:[mySQLConnection stringEncoding]];
 	}
 
@@ -4063,7 +4070,9 @@
 	if (![prefs boolForKey:SPDisplayBinaryDataAsHex]) {
 		return NO;
 	}
-	
+#warning FIX ME!
+	return YES;
+#if 0
 	NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
 	NSString *typeGrouping = columnDefinition[@"typegrouping"];
 	
@@ -4074,7 +4083,7 @@
 	if ([typeGrouping isEqual:@"blobdata"]) {
 		return YES;
 	}
-	
+#endif
 	
 	return NO;
 }
