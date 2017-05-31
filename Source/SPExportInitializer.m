@@ -122,11 +122,21 @@
 	// Set whether or not we are to export to multiple files
 	[self setExportToMultipleFiles:[exportFilePerTableCheck state]];
 	
+	//
+	// Translating binary blobs to hex for CSV export depends on a CSV-specific
+	// export setting. We have to feed that to currentDataResultWithNULLs so it
+	// can populate the dataArray with the correct result type.
+	//
+	BOOL hexBlobs = NO;
+	if (exportType == SPCSVExport) {
+		hexBlobs = [exportCSVBLOBFieldsAsHexCheck state] != NSOffState;
+	}
+	
 	// Get the data depending on the source
 	switch (exportSource) 
 	{
 		case SPFilteredExport:
-			dataArray = [tableContentInstance currentDataResultWithNULLs:YES hideBLOBs:NO];
+			dataArray = [tableContentInstance currentDataResultWithNULLs:YES hideBLOBs:NO hexBLOBs:hexBlobs];
 			break;
 		case SPQueryExport:
 			dataArray = [customQueryInstance currentDataResultWithNULLs:YES truncateDataFields:NO];
@@ -241,7 +251,9 @@
 		
 		SPCSVExporter *csvExporter = nil;
 		
-		// If the user has selected to only export to a single file or this is a filtered or custom query 
+		BOOL hexBlobs = [exportCSVBLOBFieldsAsHexCheck state] != NSOffState;
+
+		// If the user has selected to only export to a single file or this is a filtered or custom query
 		// export, create the single file now and assign it to all subsequently created exporters.
 		if ((![self exportToMultipleFiles]) || (exportSource == SPFilteredExport) || (exportSource == SPQueryExport)) {
 			NSString *selectedTableName = nil;
@@ -268,6 +280,7 @@
 			for (NSString *table in exportTables) 
 			{				
 				csvExporter = [self initializeCSVExporterForTable:table orDataArray:nil];
+				[csvExporter setCsvOutputEncodeBLOBasHex: hexBlobs];
 				
 				// If required create a single file handle for all CSV exports
 				if (![self exportToMultipleFiles]) {
@@ -287,6 +300,7 @@
 		}
 		else {
 			csvExporter = [self initializeCSVExporterForTable:nil orDataArray:dataArray];
+			[csvExporter setCsvOutputEncodeBLOBasHex: hexBlobs];
 			
 			[exportFiles addObject:singleExportFile];
 			

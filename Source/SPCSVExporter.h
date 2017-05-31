@@ -54,7 +54,8 @@
 	NSString *csvNULLString;
 	
 	BOOL csvOutputFieldNames;
-	
+	BOOL csvOutputEncodeBLOBasHex;
+
 	SPTableData *csvTableData;
 }
 
@@ -109,5 +110,10 @@
 @property(readwrite, retain) SPTableData *csvTableData;
 
 - (id)initWithDelegate:(NSObject *)exportDelegate;
+
+/**
+ * @property csvOutputEncodeBLOBasHex Encode BLOB fields as Hex data
+ */
+@property(readwrite, assign) BOOL csvOutputEncodeBLOBasHex;
 
 @end

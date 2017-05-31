@@ -48,6 +48,7 @@
 @synthesize csvLineEndingString;
 @synthesize csvNULLString;
 @synthesize csvTableData;
+@synthesize csvOutputEncodeBLOBasHex;
 
 /**
  * Initialise an instance of SPCSVExporter using the supplied delegate.
@@ -278,14 +279,21 @@
 			
 			// Retrieve the contents of this cell
 			if ([csvCell isKindOfClass:[NSData class]]) {
-				dataConversionString = [[NSString alloc] initWithData:csvCell encoding:[self exportOutputEncoding]];
-				
-				if (dataConversionString == nil) {
-					dataConversionString = [[NSString alloc] initWithData:csvCell encoding:NSASCIIStringEncoding];
+				if (csvOutputEncodeBLOBasHex) {
+					dataConversionString = [[NSString alloc] initWithFormat:@"0x%@", [csvCell dataToHexString]];
+					[csvCellString setString:[NSString stringWithString:dataConversionString]];
+					[dataConversionString release];
 				}
-				
-				[csvCellString setString:[NSString stringWithString:dataConversionString]];
-				[dataConversionString release];
+				else {
+					dataConversionString = [[NSString alloc] initWithData:csvCell encoding:[self exportOutputEncoding]];
+					
+					if (dataConversionString == nil) {
+						dataConversionString = [[NSString alloc] initWithData:csvCell encoding:NSASCIIStringEncoding];
+					}
+					
+					[csvCellString setString:[NSString stringWithString:dataConversionString]];
+					[dataConversionString release];
+				}
 			}
 			else if ([csvCell isKindOfClass:[SPMySQLGeometryData class]]) {
 				[csvCellString setString:[csvCell wktString]];

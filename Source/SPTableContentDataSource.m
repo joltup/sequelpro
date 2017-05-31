@@ -218,12 +218,8 @@
 	}
 }
 
-- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex
+- (BOOL)_cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex
 {
-	if (![prefs boolForKey:SPDisplayBinaryDataAsHex]) {
-		return NO;
-	}
-	
 	NSDictionary *columnDefinition = [[(id <SPDatabaseContentViewDelegate>)[tableContentView delegate] dataColumnDefinitions] objectAtIndex:columnIndex];
 	NSString *typeGrouping = columnDefinition[@"typegrouping"];
 	
@@ -238,6 +234,24 @@
 	
 	return NO;
 }
+
+- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex
+{
+	if (![prefs boolForKey:SPDisplayBinaryDataAsHex]) {
+		return NO;
+	}
+	return [self _cellValueIsDisplayedAsHexForColumn:columnIndex];
+}
+
+- (BOOL)cellValueIsDisplayedAsHexForColumn:(NSUInteger)columnIndex hexBLOBs:(BOOL)hexBlobs
+{
+	if (!hexBlobs) {
+		return NO;
+	}
+	return [self _cellValueIsDisplayedAsHexForColumn:columnIndex];
+}
+
+
 
 @end
 

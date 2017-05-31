@@ -2361,7 +2361,7 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
  * Returns the current result (as shown in table content view) as array, the first object containing the field
  * names as array, the following objects containing the rows as array.
  */ 
-- (NSArray *)currentDataResultWithNULLs:(BOOL)includeNULLs hideBLOBs:(BOOL)hide
+- (NSArray *)currentDataResultWithNULLs:(BOOL)includeNULLs hideBLOBs:(BOOL)hide hexBLOBs:(BOOL)hexBlobs
 {
 	NSInteger i;
 	NSArray *tableColumns;
@@ -2446,7 +2446,7 @@ static NSString *SPTableFilterSetDefaultOperator = @"SPTableFilterSetDefaultOper
 					if (hide) {
 						str = @"&lt;BLOB&gt;";
 					}
-					else if ([self cellValueIsDisplayedAsHexForColumn:columnIndex]) {
+					else if ([self cellValueIsDisplayedAsHexForColumn:columnIndex hexBLOBs:hexBlobs]) {
 						str = [NSString stringWithFormat:@"0x%@", [o dataToHexString]];
 					}
 					else {
