@@ -139,7 +139,7 @@
 			dataArray = [tableContentInstance currentDataResultWithNULLs:YES hideBLOBs:NO hexBLOBs:hexBlobs];
 			break;
 		case SPQueryExport:
-			dataArray = [customQueryInstance currentDataResultWithNULLs:YES truncateDataFields:NO];
+			dataArray = [customQueryInstance currentDataResultWithNULLs:YES truncateDataFields:NO hexBLOBs:hexBlobs];
 			break;
 		case SPTableExport:
 			// Create an array of tables to export

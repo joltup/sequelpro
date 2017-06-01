@@ -1534,8 +1534,8 @@
  * the field names as an array and the following objects containing the rows as arrays.
  */
 - (NSArray *)currentResult
-{	
-	return [self currentDataResultWithNULLs:NO truncateDataFields:YES];
+{
+	return [self currentDataResultWithNULLs:NO truncateDataFields:YES hexBLOBs:NO];
 }
 
 /**
@@ -1556,7 +1556,7 @@
  *                     or use the user's NULL string representation preference.
  * @param truncate     Indicates whether to truncate data fields for display purposes.
  */
-- (NSArray *)currentDataResultWithNULLs:(BOOL)includeNULLs truncateDataFields:(BOOL)truncate
+- (NSArray *)currentDataResultWithNULLs:(BOOL)includeNULLs truncateDataFields:(BOOL)truncate hexBLOBs:(BOOL)hexBlobs
 {
 	NSInteger i;	
 	id tableColumn;
@@ -1581,7 +1581,7 @@
 		
 		while ((tableColumn = [enumerator nextObject])) 
 		{
-			[tempRow addObject:[self _resultDataItemAtRow:i columnIndex:[[tableColumn identifier] integerValue] preserveNULLs:includeNULLs asPreview:truncate]];
+			[tempRow addObject:[self _resultDataItemAtRow:i columnIndex:[[tableColumn identifier] integerValue] preserveNULLs:includeNULLs asPreview:truncate hexBLOBs:hexBlobs]];
 		}
 		
 		[currentResult addObject:[NSArray arrayWithArray:tempRow]];
@@ -3572,6 +3572,9 @@
 		[customQueryView setFont:tableFont];
 		[customQueryView reloadData];
 	}
+	else if ([keyPath isEqualToString:SPDisplayBinaryDataAsHex]) {
+		[customQueryView reloadData];
+	}
 }
 
 /**
@@ -3994,6 +3997,7 @@
 
 #ifndef SP_CODA
 	[prefs addObserver:self forKeyPath:SPGlobalResultTableFont options:NSKeyValueObservingOptionNew context:NULL];
+	[prefs addObserver:self forKeyPath:SPDisplayBinaryDataAsHex options:NSKeyValueObservingOptionNew context:NULL];
 #endif
 
 }
@@ -4007,10 +4011,11 @@
  * @param row           The row index
  * @param column        The column index
  * @param preserveNULLs Whether t
+ * @param hexBlobs		Convert binary blobs to hexadecimal
  * 
  * @return The value from the data storage
  */
-- (id)_resultDataItemAtRow:(NSInteger)row columnIndex:(NSUInteger)column preserveNULLs:(BOOL)preserveNULLs asPreview:(BOOL)asPreview;
+- (id)_resultDataItemAtRow:(NSInteger)row columnIndex:(NSUInteger)column preserveNULLs:(BOOL)preserveNULLs asPreview:(BOOL)asPreview hexBLOBs:(BOOL)hexBlobs
 {
 #warning duplicate code with SPTableContentDataSource.m tableView:objectValueForTableColumn:…
 	id value = nil;
@@ -4045,11 +4050,29 @@
 		return preserveNULLs ? value : [prefs objectForKey:SPNullValue];
 
 	if ([value isKindOfClass:[NSData class]]) {
+		if (hexBlobs)
+			return [NSString stringWithFormat: @"0x%@", [value dataToHexString]];
 		return [value stringRepresentationUsingEncoding:[mySQLConnection stringEncoding]];
 	}
 
 	return value;
 }
+
+/**
+ * Retrieves the value from the underlying data storage at the supplied row and column indices.
+ *
+ * @param row           The row index
+ * @param column        The column index
+ * @param preserveNULLs Whether t
+ *
+ * @return The value from the data storage
+ */
+- (id)_resultDataItemAtRow:(NSInteger)row columnIndex:(NSUInteger)column preserveNULLs:(BOOL)preserveNULLs asPreview:(BOOL)asPreview
+{
+	BOOL hexBlobs = [prefs boolForKey:SPDisplayBinaryDataAsHex];
+	return [self _resultDataItemAtRow:row columnIndex:column preserveNULLs:preserveNULLs asPreview:asPreview hexBLOBs:hexBlobs];
+}
+
 
 //this method is called right before the UI objects are deallocated
 - (void)documentWillClose:(NSNotification *)notification
@@ -4065,6 +4088,7 @@
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 #ifndef SP_CODA
 	[prefs removeObserver:self forKeyPath:SPGlobalResultTableFont];
+	[prefs removeObserver:self forKeyPath:SPDisplayBinaryDataAsHex];
 #endif
 	[NSObject cancelPreviousPerformRequestsWithTarget:customQueryView];
 
