@@ -56,6 +56,7 @@
                 <outlet property="exportTablelistScrollView" destination="1087" id="1275"/>
                 <outlet property="exportTypeTabBar" destination="573" id="1257"/>
                 <outlet property="exportUseUTF8BOMButton" destination="1150" id="1276"/>
+                <outlet property="exportXMLBLOBFieldsAsHexCheck" destination="fEY-vy-6nw" id="RoO-pN-Wnc"/>
                 <outlet property="exportXMLFormatPopUpButton" destination="1365" id="1373"/>
                 <outlet property="exportXMLIncludeContent" destination="1357" id="1363"/>
                 <outlet property="exportXMLIncludeStructure" destination="1355" id="1364"/>
@@ -870,6 +871,14 @@ Gw
                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                         </textFieldCell>
                                     </textField>
+                                    <button misplaced="YES" id="fEY-vy-6nw" userLabel="ExportXMLBLOB fields as hex">
+                                        <rect key="frame" x="12" y="81" width="232" height="18"/>
+                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                        <buttonCell key="cell" type="check" title="Output BLOB fields as hex" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" state="on" inset="2" id="WoJ-SW-cLP">
+                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                            <font key="font" metaFont="smallSystem"/>
+                                        </buttonCell>
+                                    </button>
                                 </subviews>
                             </view>
                         </tabViewItem>

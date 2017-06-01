@@ -49,6 +49,7 @@
 	
 	BOOL xmlOutputIncludeStructure;
 	BOOL xmlOutputIncludeContent;
+	BOOL xmlOutputEncodeBLOBasHex;
 	
 	SPXMLExportFormat xmlFormat;
 }
@@ -89,5 +90,11 @@
 @property (readwrite, assign) SPXMLExportFormat xmlFormat;
 
 - (id)initWithDelegate:(NSObject *)exportDelegate;
+
+/**
+ * @property xmlOutputEncodeBLOBasHex Encode BLOB fields as Hex data
+ */
+@property(readwrite, assign) BOOL xmlOutputEncodeBLOBasHex;
+
 
 @end

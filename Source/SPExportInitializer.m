@@ -131,6 +131,9 @@
 	if (exportType == SPCSVExport) {
 		hexBlobs = [exportCSVBLOBFieldsAsHexCheck state] != NSOffState;
 	}
+	else if (exportType == SPXMLExport) {
+		hexBlobs = [exportXMLBLOBFieldsAsHexCheck state] != NSOffState;
+	}
 	
 	// Get the data depending on the source
 	switch (exportSource) 
@@ -355,7 +358,9 @@
 		
 		SPXMLExporter *xmlExporter = nil;
 		
-		// If the user has selected to only export to a single file or this is a filtered or custom query 
+		BOOL hexBlobs = [exportXMLBLOBFieldsAsHexCheck state] != NSOffState;
+
+		// If the user has selected to only export to a single file or this is a filtered or custom query
 		// export, create the single file now and assign it to all subsequently created exporters.
 		if ((![self exportToMultipleFiles]) || (exportSource == SPFilteredExport) || (exportSource == SPQueryExport)) {
 			NSString *selectedTableName = nil;
@@ -381,6 +386,7 @@
 			for (NSString *table in exportTables) 
 			{				
 				xmlExporter = [self initializeXMLExporterForTable:table orDataArray:nil];
+				[xmlExporter setXmlOutputEncodeBLOBasHex: hexBlobs];
 				
 				// If required create a single file handle for all XML exports 
 				if (![self exportToMultipleFiles]) {
@@ -400,6 +406,7 @@
 		}
 		else {
 			xmlExporter = [self initializeXMLExporterForTable:nil orDataArray:dataArray];
+			[xmlExporter setXmlOutputEncodeBLOBasHex: hexBlobs];
 			
 			[singleExportFile setExportFileNeedsXMLHeader:YES];
 			

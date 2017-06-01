@@ -119,6 +119,7 @@
 	IBOutlet NSButton *exportXMLIncludeStructure;
 	IBOutlet NSButton *exportXMLIncludeContent;
 	IBOutlet NSTextField *exportXMLNULLValuesAsTextField;
+	IBOutlet NSButton *exportXMLBLOBFieldsAsHexCheck;
 
 	// Dot
 	IBOutlet NSButton *exportDotForceLowerTableNamesCheck;

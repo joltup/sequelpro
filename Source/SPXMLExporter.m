@@ -44,6 +44,7 @@
 @synthesize xmlOutputIncludeStructure;
 @synthesize xmlOutputIncludeContent;
 @synthesize xmlFormat;
+@synthesize xmlOutputEncodeBLOBasHex;
 
 /**
  * Initialise an instance of SPXMLExporter using the supplied delegate.
@@ -246,14 +247,21 @@
 				
 				// Retrieve the contents of this tag
 				if ([data isKindOfClass:[NSData class]]) {
-					dataConversionString = [[NSString alloc] initWithData:data encoding:[self exportOutputEncoding]];
-					
-					if (dataConversionString == nil) {
-						dataConversionString = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
+					if (xmlOutputEncodeBLOBasHex) {
+						dataConversionString = [[NSString alloc] initWithString: [data dataToHexString]];
+						[xmlItem setString: [NSString stringWithString: dataConversionString]];
+						[dataConversionString release];
 					}
-					
-					[xmlItem setString:[NSString stringWithString:dataConversionString]];
-					[dataConversionString release];
+					else {
+						dataConversionString = [[NSString alloc] initWithData:data encoding:[self exportOutputEncoding]];
+						
+						if (dataConversionString == nil) {
+							dataConversionString = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
+						}
+						
+						[xmlItem setString:[NSString stringWithString:dataConversionString]];
+						[dataConversionString release];
+					}
 				}
 
 				// Check for null value using a pointer comparison; as [NSNull null] is a singleton this works correctly.
@@ -276,6 +284,9 @@
 					
 					if (dataIsNULL) {
 						[xmlString appendString:@" xsi:nil=\"true\" />\n"];
+					}
+					else if (xmlOutputEncodeBLOBasHex) {
+						[xmlString appendFormat:@" xsi:type=\"xs:hexBinary\">%@</field>\n", xmlItem];
 					}
 					else {
 						[xmlString appendFormat:@">%@</field>\n", [xmlItem HTMLEscapeString]];
